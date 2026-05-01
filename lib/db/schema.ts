@@ -99,6 +99,26 @@ export const repos = pgTable(
 )
 
 /**
+ * LessonStep — a single ordered step in a lesson plan. Stored as JSONB
+ * arrays on resources.lesson_plan (Haiku's not_yet plan) and
+ * queue_items.lesson_plan (Sonnet's keep-on-promote plan, or inherited
+ * from resources for not_yet promotes). Per design review:
+ *   - 'capability': "first reach Have/Partial on Theme > Sub-cap"
+ *   - 'resource':   "consume an existing library item first" (Sonnet only)
+ *   - 'doing':      "build/read/practice X yourself"
+ */
+export type LessonStep = {
+  order: number
+  title: string
+  type: 'capability' | 'resource' | 'doing'
+  capability?: Capability
+  resourceId?: number
+  description: string
+  estimatedEffort: 'S' | 'M' | 'L'
+  done: boolean
+}
+
+/**
  *   ┌──────────────────────────────────────────────────────────────┐
  *   │  resources                                                   │
  *   │  ─────────                                                   │
@@ -132,6 +152,12 @@ export const resources = pgTable(
       .default([]),
     verdictReason: text('verdict_reason'),
     reviewPrompt: text('review_prompt'), // populated when verdict='needs_review'
+    /**
+     * Haiku-emitted lesson plan for verdict='not_yet'. null otherwise.
+     * Inherited by queue_items on promote (overwritten by Sonnet's
+     * keep-on-promote plan if verdict was keep at promote time).
+     */
+    lessonPlan: jsonb('lesson_plan').$type<LessonStep[]>().default([]).notNull(),
     addedAt: timestamp('added_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -144,24 +170,6 @@ export const resources = pgTable(
     verdictIdx: index('resources_verdict_idx').on(t.verdict),
   }),
 )
-
-/**
- * LessonStep — a single ordered step in a queue item's lesson_plan.
- * Stored as JSONB array on queue_items.lesson_plan. Per design review:
- *   - 'capability': "first reach Have on Theme > Sub-cap"
- *   - 'resource':   "consume an existing library item first"
- *   - 'doing':      "build/read/practice X yourself"
- */
-export type LessonStep = {
-  order: number
-  title: string
-  type: 'capability' | 'resource' | 'doing'
-  capability?: Capability // type='capability'
-  resourceId?: number // type='resource' → joins resources.id
-  description: string
-  estimatedEffort: 'S' | 'M' | 'L'
-  done: boolean
-}
 
 /**
  *   ┌──────────────────────────────────────────────────────────────┐
