@@ -1,0 +1,21 @@
+node_modules
+.next
+.env
+.env.local
+*.log
+.DS_Store
+.turbo
+dist
+out
+
+# Local pg data
+pgdata/
+
+# IDE
+.idea
+.vscode
+
+# CC
+.claude/
+next-env.d.ts
+tsconfig.tsbuildinfo

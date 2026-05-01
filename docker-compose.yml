@@ -1,0 +1,19 @@
+services:
+  pg:
+    image: pgvector/pgvector:pg17
+    container_name: ainextleveler-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ainextleveler
+    ports:
+      # 5433 to avoid collision with any host pg on 5432.
+      - "5433:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ainextleveler"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

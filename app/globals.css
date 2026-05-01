@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Locked design tokens (per /plan-design-review):
+   - shadcn neutral palette base
+   - one accent: green-600 (used sparingly for Have status + primary CTAs)
+   - NO purple/violet/indigo gradients
+   - body 16px min, line-height 1.5
+   - card border-radius capped at 6px
+*/
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;          /* neutral-900 */
+    --muted: 0 0% 96%;              /* neutral-100 */
+    --muted-foreground: 0 0% 45%;   /* neutral-500 */
+    --border: 0 0% 90%;             /* neutral-200 */
+    --input: 0 0% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --accent: 142 71% 35%;          /* green-600 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+  }
+  .dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 96%;
+    --muted: 0 0% 13%;              /* neutral-900 */
+    --muted-foreground: 0 0% 63%;   /* neutral-400 */
+    --border: 0 0% 20%;             /* neutral-800 */
+    --input: 0 0% 20%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 96%;
+    --accent: 142 60% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+  }
+  body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { line-height: 1.3; }
+  h1 { font-size: 32px; font-weight: 700; }
+  h2 { font-size: 24px; font-weight: 600; }
+  h3 { font-size: 20px; font-weight: 600; }
+  h4 { font-size: 16px; font-weight: 600; }
+}
