@@ -72,7 +72,11 @@ export function BackfillBanner({ pending }: { pending: number }) {
           {pending}{' '}
           {pending === 1 ? 'capability has' : 'capabilities have'} no embedding
           (Voyage was unavailable). pgvector similarity skips these rows until
-          they're filled.
+          they&apos;re filled.{' '}
+          <span className="text-[hsl(var(--muted-foreground))]">
+            Bulk embeds run at 2/min for free-tier Voyage — ~{Math.ceil((pending * 30) / 60)}{' '}
+            min for {pending}.
+          </span>
         </span>
         <button
           type="button"

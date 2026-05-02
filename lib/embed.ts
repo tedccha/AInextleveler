@@ -18,6 +18,17 @@ const VOYAGE_API = 'https://api.voyageai.com/v1/embeddings'
 const VOYAGE_MODEL = 'voyage-3'
 export const EMBEDDING_DIMS = 1024
 
+/**
+ * Delay between sequential bulk embed calls. Set for Voyage free tier
+ * (3 RPM ceiling) with safety margin → 2 RPM = 30000ms between calls.
+ * 17 capabilities ≈ 8.5 min to backfill. Bump down if on a paid tier.
+ *
+ * Single-paste classify (lib/llm/* + app/api/classify) calls
+ * embedSingle() directly with no delay — this constant only affects
+ * bulk paths (scan, backfill).
+ */
+export const BULK_EMBED_DELAY_MS = 30_000
+
 type VoyageResponse = {
   data: Array<{ embedding: number[]; index: number }>
   model: string
@@ -87,7 +98,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
  */
 export async function embedBulk(
   texts: string[],
-  delayMs = 100,
+  delayMs = BULK_EMBED_DELAY_MS,
 ): Promise<Array<number[] | null>> {
   const out: Array<number[] | null> = []
   for (let i = 0; i < texts.length; i++) {

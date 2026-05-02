@@ -26,7 +26,7 @@
 
 import { db, schema } from '@/lib/db/client'
 import { and, eq, sql } from 'drizzle-orm'
-import { embedSingle } from '@/lib/embed'
+import { embedSingle, BULK_EMBED_DELAY_MS } from '@/lib/embed'
 import {
   type Capability,
   type Theme,
@@ -340,7 +340,7 @@ export async function* scanGitHub(
     const key = aggKeys[i]
     const cap = agg.get(key)!.capability
     yield { type: 'embedding', index: i + 1, total: aggKeys.length, key }
-    if (i > 0) await new Promise((r) => setTimeout(r, 100))
+    if (i > 0) await new Promise((r) => setTimeout(r, BULK_EMBED_DELAY_MS))
     const vec = await embedSingle(capabilityEmbedString(cap))
     if (vec === null) embedFailures++
     embeddings.set(key, vec)

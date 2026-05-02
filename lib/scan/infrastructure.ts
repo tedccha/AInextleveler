@@ -24,7 +24,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { db, schema } from '@/lib/db/client'
 import { and, eq } from 'drizzle-orm'
-import { embedSingle } from '@/lib/embed'
+import { embedSingle, BULK_EMBED_DELAY_MS } from '@/lib/embed'
 import {
   type Capability,
   type Theme,
@@ -380,7 +380,7 @@ export async function* scanInfrastructure(): AsyncGenerator<
     const k = keys[i]
     const { capability } = unique.get(k)!
     yield { type: 'embedding', index: i + 1, total: keys.length, key: k }
-    if (i > 0) await new Promise((r) => setTimeout(r, 100))
+    if (i > 0) await new Promise((r) => setTimeout(r, BULK_EMBED_DELAY_MS))
     const vec = await embedSingle(capabilityEmbedString(capability))
     if (vec === null) embedFailures++
     embeddings.set(k, vec)

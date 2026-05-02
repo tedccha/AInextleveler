@@ -13,7 +13,7 @@
 import { withSession } from '@/lib/auth'
 import { db, schema } from '@/lib/db/client'
 import { eq, isNull } from 'drizzle-orm'
-import { embedSingle } from '@/lib/embed'
+import { embedSingle, BULK_EMBED_DELAY_MS } from '@/lib/embed'
 import { capabilityEmbedString, type Theme } from '@/lib/taxonomy'
 
 export const runtime = 'nodejs'
@@ -66,7 +66,7 @@ export const POST = withSession(async () => {
         let capsDone = 0
         let capsFailed = 0
         for (let i = 0; i < capRows.length; i++) {
-          if (i > 0) await new Promise((r) => setTimeout(r, 100))
+          if (i > 0) await new Promise((r) => setTimeout(r, BULK_EMBED_DELAY_MS))
           const row = capRows[i]
           const label = `${row.theme} > ${row.name}`
           send({
@@ -98,7 +98,7 @@ export const POST = withSession(async () => {
         let resFailed = 0
         for (let i = 0; i < resRows.length; i++) {
           if (i > 0 || capRows.length > 0)
-            await new Promise((r) => setTimeout(r, 100))
+            await new Promise((r) => setTimeout(r, BULK_EMBED_DELAY_MS))
           const row = resRows[i]
           const label =
             row.url ?? `resource #${row.id}`
