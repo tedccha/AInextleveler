@@ -3,14 +3,13 @@
  * Add-to-queue. Different from Haiku's `not_yet` lesson_plan in two ways:
  *
  *   - Audience: user is READY to consume this resource. Lesson plan is the
- *     path THROUGH the resource, not lead-up to it.
+ *     path THROUGH the resource, not the lead-up to it.
  *   - Step types: prefer `doing` (build, run, modify) and `resource` (link
  *     to other library items the user has). Avoid `capability` here unless
  *     a specific Have/Partial threshold matters before a step.
  *
- * Per plan Lesson Plans section. Sonnet (not Haiku) because this benefits
- * from more thoughtful synthesis — Haiku is too rote for "design a path
- * through this content given the user's state."
+ *   Implementation note: tool_use guarantees structured output. System
+ *   prompt is cached (taxonomy + rules are identical across promotes).
  */
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -21,20 +20,21 @@ import {
   taxonomyForPrompt,
 } from '@/lib/taxonomy'
 import type { LessonStep } from '@/lib/db/schema'
+import { extractToolInput, ToolUseExtractError } from './tool-use'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TOKENS = 2048
+const TOOL_NAME = 'record_lesson_plan'
 
 export type LessonPlanInput = {
   resource: {
     id: number
     title: string
     url: string | null
-    contentText: string // already capped at 4000
+    contentText: string
     capabilitiesTaught: Capability[]
   }
   userCapabilities: Capability[]
-  /** Other keep/already_have resource IDs the user has, used for "resource" step type. */
   availableLibrary: Array<{ id: number; title: string }>
 }
 
@@ -54,43 +54,100 @@ function client(): Anthropic {
   return _client
 }
 
-function buildSystemPrompt(): string {
+const SYSTEM_PROMPT = (() => {
   const taxonomy = taxonomyForPrompt()
   return `You generate a lesson plan for a developer who has chosen a piece of content to work through. They have already decided to keep it. Your job: design the path they should take THROUGH this resource given their current capability profile.
 
-# LIFECYCLE TAXONOMY (the ONLY valid {theme, name} pairs)
+LIFECYCLE TAXONOMY (the ONLY valid {theme, name} pairs):
 
 ${JSON.stringify(taxonomy, null, 2)}
 
-# OUTPUT SCHEMA (JSON only, no prose, no markdown)
-
-{
-  "why_now": string (1-2 sentences explaining why this is the right thing for the user to tackle now, given what they're missing),
-  "lesson_plan": LessonStep[]
-}
-
-LessonStep = {
-  "order": number (starting at 1),
-  "title": string (imperative — "Set up the dev env", "Build the example", "Read section 4"),
-  "type": "doing" | "resource" | "capability",
-  "capability": {"theme": "...", "name": "..."} | null,
-  "resource_id": number | null,
-  "description": string (1-2 sentences — what to do AND why),
-  "estimated_effort": "S" | "M" | "L"
-}
-
-# STEP TYPE RULES
-
+STEP TYPE RULES:
 - Prefer "doing" for most steps (the user is consuming THIS content actively).
-- Use "resource" when the user has another keep/already_have item in their library that should be read first. The resource_id MUST be from the AVAILABLE LIBRARY list provided.
+- Use "resource" when the user has another keep/already_have item in their library that should be read first. The resource_id MUST be from the AVAILABLE LIBRARY list provided in the user message.
 - Use "capability" sparingly — only when a specific Have/Partial threshold should be reached before this step. capability.theme and capability.name MUST be exact taxonomy strings.
 
-# OTHER RULES
-
+OTHER RULES:
 - 2-5 steps total. More than 5 dilutes; fewer than 2 isn't a plan.
 - "estimated_effort": S=under 30 min, M=30 min-2 hr, L=2+ hr.
 - Order steps from earliest to latest in dependency.
-- Output ONLY the JSON object. No prose, no markdown code fences.`
+- "why_now" is 1-2 sentences explaining why this is the right thing for the user to tackle now.`
+})()
+
+const TOOL: Anthropic.Tool = {
+  name: TOOL_NAME,
+  description:
+    'Record the why_now rationale and ordered lesson plan for the user to work through this resource.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      why_now: {
+        type: 'string',
+        description:
+          '1-2 sentences explaining why this is the right thing for the user to tackle now, given what they are missing.',
+      },
+      lesson_plan: {
+        type: 'array',
+        description: '2-5 ordered steps for the user to work through.',
+        items: {
+          type: 'object',
+          properties: {
+            order: { type: 'integer', description: 'Starting at 1.' },
+            title: {
+              type: 'string',
+              description: 'Imperative verb phrase ("Set up the dev env", "Build the example").',
+            },
+            type: {
+              type: 'string',
+              enum: ['doing', 'resource', 'capability'],
+            },
+            capability: {
+              type: ['object', 'null'],
+              description: 'Required when type="capability"; otherwise null.',
+              properties: {
+                theme: { type: 'string' },
+                name: { type: 'string' },
+              },
+              required: ['theme', 'name'],
+            },
+            resource_id: {
+              type: ['integer', 'null'],
+              description:
+                'Required when type="resource"; MUST be an id from the AVAILABLE LIBRARY list. Otherwise null.',
+            },
+            description: {
+              type: 'string',
+              description: '1-2 sentences — what to do AND why.',
+            },
+            estimated_effort: { type: 'string', enum: ['S', 'M', 'L'] },
+          },
+          required: [
+            'order',
+            'title',
+            'type',
+            'capability',
+            'resource_id',
+            'description',
+            'estimated_effort',
+          ],
+        },
+      },
+    },
+    required: ['why_now', 'lesson_plan'],
+  },
+}
+
+type ToolInput = {
+  why_now?: string
+  lesson_plan?: Array<{
+    order?: number
+    title?: string
+    type?: string
+    capability?: { theme?: string; name?: string } | null
+    resource_id?: number | null
+    description?: string
+    estimated_effort?: string
+  }>
 }
 
 function buildUserPrompt(input: LessonPlanInput): string {
@@ -132,35 +189,6 @@ function buildUserPrompt(input: LessonPlanInput): string {
   ].join('\n')
 }
 
-type RawOutput = {
-  why_now?: string
-  lesson_plan?: Array<{
-    order?: number
-    title?: string
-    type?: string
-    capability?: { theme?: string; name?: string } | null
-    resource_id?: number | null
-    description?: string
-    estimated_effort?: string
-  }>
-}
-
-function tryParse(text: string): RawOutput | null {
-  try {
-    return JSON.parse(text) as RawOutput
-  } catch {
-    const stripped = text
-      .replace(/^```(?:json)?\s*/m, '')
-      .replace(/```\s*$/m, '')
-      .trim()
-    try {
-      return JSON.parse(stripped) as RawOutput
-    } catch {
-      return null
-    }
-  }
-}
-
 export async function generateLessonPlan(
   input: LessonPlanInput,
 ): Promise<LessonPlanOutput> {
@@ -168,16 +196,26 @@ export async function generateLessonPlan(
   const res = await c.messages.create({
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: buildSystemPrompt(),
+    system: [
+      {
+        type: 'text',
+        text: SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [TOOL],
+    tool_choice: { type: 'tool', name: TOOL_NAME },
     messages: [{ role: 'user', content: buildUserPrompt(input) }],
   })
-  const block = res.content[0]
-  if (!block || block.type !== 'text') {
-    throw new Error('Sonnet returned no text block')
-  }
-  const parsed = tryParse(block.text)
-  if (!parsed) {
-    throw new Error('Sonnet returned malformed JSON')
+
+  let parsed: ToolInput
+  try {
+    parsed = extractToolInput<ToolInput>(res, TOOL_NAME)
+  } catch (err) {
+    if (err instanceof ToolUseExtractError) {
+      throw new Error(`Sonnet did not invoke ${TOOL_NAME}: ${err.message}`)
+    }
+    throw err
   }
 
   const validResourceIds = new Set(input.availableLibrary.map((r) => r.id))
@@ -211,7 +249,10 @@ export async function generateLessonPlan(
         name: s.capability.name,
       }
     } else if (stepType === 'resource') {
-      if (typeof s.resource_id !== 'number' || !validResourceIds.has(s.resource_id)) {
+      if (
+        typeof s.resource_id !== 'number' ||
+        !validResourceIds.has(s.resource_id)
+      ) {
         dropped++
         continue
       }
@@ -241,7 +282,6 @@ export async function generateLessonPlan(
     })
   }
 
-  // Re-number to 1..N
   out.sort((a, b) => a.order - b.order)
   for (let i = 0; i < out.length; i++) out[i].order = i + 1
 
