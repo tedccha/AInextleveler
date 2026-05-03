@@ -27,6 +27,7 @@ import { eq, sql } from 'drizzle-orm'
 import { type Capability, type Theme } from '@/lib/taxonomy'
 import { generateLessonPlan } from '@/lib/llm/sonnet-lesson-plan'
 import type { LessonStep } from '@/lib/db/schema'
+import { loadRankContext, rankSingle } from '@/lib/rank-queue'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -162,6 +163,17 @@ export const POST = withSession(async (req) => {
           }
         }
 
+        // Compute initial rank_score so the item lands in the right
+        // queue position immediately — avoids requiring a re-rank click
+        // just to surface a freshly promoted item.
+        const rankCtx = await loadRankContext()
+        const initialRank = rankSingle(rankCtx, {
+          resourceId: resource.id,
+          contentEmbedding: resource.contentEmbedding,
+          prerequisites: (resource.prerequisites as Capability[]) ?? [],
+          addedAt: resource.addedAt,
+        })
+
         const inserted = await db
           .insert(schema.queueItems)
           .values({
@@ -170,8 +182,7 @@ export const POST = withSession(async (req) => {
             primaryTheme,
             whyNow,
             lessonPlan,
-            // rank_score will be filled in by Step 6 / re-rank.
-            rankScore: 0,
+            rankScore: initialRank,
           })
           .returning({ id: schema.queueItems.id })
 
