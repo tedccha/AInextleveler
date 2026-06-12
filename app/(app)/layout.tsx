@@ -15,25 +15,15 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Single auth gate per eng review A1.
   await requireSession()
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-[hsl(var(--border))]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <nav className="flex items-center gap-6 text-sm">
-            <span className="font-semibold">AInextleveler</span>
-            <Link href="/capability-map" className="hover:underline">
-              Capability Map
-            </Link>
-            <Link href="/inbox" className="hover:underline">
-              Inbox
-            </Link>
-            <Link href="/next" className="hover:underline">
-              Next
-            </Link>
-          </nav>
+          <Link href="/" className="font-semibold hover:text-[hsl(var(--accent))]">
+            AI Workshop
+          </Link>
           <form action={logoutAction}>
             <button
               type="submit"

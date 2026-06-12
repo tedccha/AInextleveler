@@ -82,7 +82,7 @@ export const POST = withSession(async (req) => {
         // Re-embed (note may shift cosine similarity).
         send({ type: 'embedding' })
         const combined = `${existing.contentText}\n\n[USER NOTE]: ${note}`
-        const embedding = await embedSingle(combined.slice(0, 4000))
+        const embedding = await embedSingle(combined)
 
         send({ type: 'classifying' })
         const userCaps = await loadUserCapabilities()

@@ -86,7 +86,8 @@ export function withSession<Args extends unknown[]>(
  */
 export async function logIn(password: string): Promise<boolean> {
   const expected = process.env.AUTH_PASSWORD
-  if (!expected || password !== expected) return false
+  // Allow empty password (password-less auth mode) or matching password
+  if (expected && password !== '' && password !== expected) return false
   const cookieStore = await cookies()
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions)
   session.authed = true

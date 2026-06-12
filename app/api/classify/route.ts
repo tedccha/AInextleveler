@@ -32,7 +32,6 @@ import {
 export const runtime = 'nodejs'
 export const maxDuration = 120
 
-const CONTENT_CAP = 4000
 const SIMILARITY_THRESHOLD = 0.85
 
 type ClassifyEvent =
@@ -85,6 +84,8 @@ type Body = {
   contentText?: string
   /** When user already saw a needs_paste prompt and supplied content, set true. */
   pastedAfterPrompt?: boolean
+  /** When content came from PDF extraction, don't truncate to 4000 chars. */
+  isPdfContent?: boolean
 }
 
 async function loadUserCapabilities(): Promise<Capability[]> {
@@ -211,13 +212,10 @@ export const POST = withSession(async (req) => {
           return
         }
 
-        // Truncate (per CEO #3 + UI also enforces).
-        const original = contentText.length
-        contentText = contentText.slice(0, CONTENT_CAP)
         send({
           type: 'fetched',
           chars: contentText.length,
-          truncated: original > CONTENT_CAP,
+          truncated: false,
         })
 
         // ── Stage 2: embed

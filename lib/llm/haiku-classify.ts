@@ -378,11 +378,16 @@ export async function classifyContent(
     CONFIDENCES.has(parsed.confidence as never) ? parsed.confidence : 'medium'
   ) as 'high' | 'medium' | 'low'
 
-  // App-level override: confidence:low + verdict !== needs_review → flip.
-  // Per design Q2: when verdict IS already needs_review, ignore confidence.
+  // App-level override: confidence:low → flip to keep. Per product update: auto-add to library.
   let overriddenByConfidence = false
-  if (confidence === 'low' && verdict !== 'needs_review') {
-    verdict = 'needs_review'
+  if (confidence === 'low' && verdict !== 'keep') {
+    verdict = 'keep'
+    overriddenByConfidence = true
+  }
+
+  // Never return needs_review — convert to keep
+  if (verdict === 'needs_review') {
+    verdict = 'keep'
     overriddenByConfidence = true
   }
 

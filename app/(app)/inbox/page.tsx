@@ -1,115 +1,84 @@
-/**
- *   ┌────────────────────────────────────────────────────────────────────────┐
- *   │  /inbox — three zones (locked information architecture)                │
- *   │                                                                        │
- *   │   1. Paste box (hero, full-width textarea + Submit)                    │
- *   │   2. Needs Review (only when count>0) — review_prompt + keep/skip      │
- *   │   3. Library — all classified items, filterable + sortable             │
- *   │                                                                        │
- *   │  Queue does NOT appear here. /next is the queue's home.                │
- *   └────────────────────────────────────────────────────────────────────────┘
- */
-
 import { db, schema } from '@/lib/db/client'
-import { desc, eq } from 'drizzle-orm'
-import { PasteBox } from './paste-box'
-import { NeedsReviewSection } from './needs-review-section'
-import { Library } from './library'
+import { eq } from 'drizzle-orm'
+import { InboxItem } from './inbox-item'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type SearchParams = { verdict?: string; sort?: string }
-
-export default async function InboxPage(props: {
-  searchParams: Promise<SearchParams>
-}) {
-  const sp = await props.searchParams
-  const verdictFilter = sp.verdict
-  const sort = sp.sort ?? 'newest'
-
-  // Load resources. Needs-review goes in its own section; everything else
-  // lives in Library.
-  const allResources = await db
+export default async function InboxPage() {
+  // Get inbox items (not yet reviewed)
+  const inboxItems = await db
     .select()
     .from(schema.resources)
-    .orderBy(
-      sort === 'oldest'
-        ? schema.resources.addedAt
-        : desc(schema.resources.addedAt),
+    .where(eq(schema.resources.status, 'inbox'))
+    .orderBy(schema.resources.addedAt)
+
+  // Get items in review (with assessments)
+  const reviewItems = await db
+    .select({
+      resource: schema.resources,
+      assessment: schema.assessments,
+    })
+    .from(schema.resources)
+    .leftJoin(
+      schema.assessments,
+      eq(schema.resources.id, schema.assessments.resourceId),
     )
+    .where(eq(schema.resources.status, 'inReview'))
+    .orderBy(schema.assessments.createdAt)
 
-  // Identify queue membership so library cards can hide the Add-to-queue
-  // button when the resource is already queued.
-  const queueResourceIds = new Set(
-    (
-      await db
-        .select({ resourceId: schema.queueItems.resourceId })
-        .from(schema.queueItems)
-    ).map((r) => r.resourceId),
-  )
-
-  const needsReview = allResources.filter((r) => r.verdict === 'needs_review')
-  const libraryAll = allResources.filter((r) => r.verdict !== 'needs_review')
-  const library =
-    verdictFilter && verdictFilter !== 'all'
-      ? libraryAll.filter((r) => r.verdict === verdictFilter)
-      : libraryAll
+  const allProjects = await db
+    .select()
+    .from(schema.projects)
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1>Inbox</h1>
-        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-          Paste a URL or content. AI evaluates against your capability map.
-        </p>
-      </header>
+      <h1>Assessment Queue</h1>
 
-      <PasteBox />
+      {/* Items pending assessment */}
+      {inboxItems.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Waiting for Assessment ({inboxItems.length})</h2>
+          <div className="space-y-3">
+            {inboxItems.map((item) => (
+              <InboxItem
+                key={item.id}
+                item={item}
+                allProjects={allProjects}
+                status="pending"
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-      {needsReview.length > 0 ? (
-        <NeedsReviewSection
-          items={needsReview.map((r) => ({
-            id: r.id,
-            url: r.url,
-            title: deriveTitle(r.url, r.contentText),
-            review_prompt: r.reviewPrompt,
-            verdict_reason: r.verdictReason,
-          }))}
-        />
-      ) : null}
+      {/* Items with assessments (awaiting approval) */}
+      {reviewItems.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Ready for Approval ({reviewItems.length})</h2>
+          <div className="space-y-4">
+            {reviewItems.map(({ resource, assessment }) => (
+              assessment ? (
+                <InboxItem
+                  key={resource.id}
+                  item={resource}
+                  assessment={assessment}
+                  allProjects={allProjects}
+                  status="review"
+                />
+              ) : null
+            ))}
+          </div>
+        </div>
+      )}
 
-      <Library
-        items={libraryAll.map((r) => ({
-          id: r.id,
-          url: r.url,
-          title: deriveTitle(r.url, r.contentText),
-          verdict: r.verdict as
-            | 'keep'
-            | 'skip'
-            | 'already_have'
-            | 'not_yet',
-          verdict_reason: r.verdictReason ?? '',
-          added_at: r.addedAt.toISOString(),
-          lesson_plan: r.lessonPlan,
-          in_queue: queueResourceIds.has(r.id),
-        }))}
-        filtered={library.map((r) => r.id)}
-        verdictFilter={verdictFilter ?? 'all'}
-        sort={sort}
-      />
+      {inboxItems.length === 0 && reviewItems.length === 0 && (
+        <div className="rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            No items in queue. Add resources from your projects to assess them.
+          </p>
+        </div>
+      )}
     </div>
   )
-}
-
-function deriveTitle(url: string | null, contentText: string): string {
-  if (url) {
-    try {
-      const u = new URL(url)
-      return `${u.hostname}${u.pathname}`.replace(/\/$/, '').slice(0, 100)
-    } catch {
-      return url.slice(0, 100)
-    }
-  }
-  return contentText.split('\n')[0]?.slice(0, 100) || 'Untitled'
 }

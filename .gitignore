@@ -19,3 +19,4 @@ pgdata/
 .claude/
 next-env.d.ts
 tsconfig.tsbuildinfo
+.gstack/
