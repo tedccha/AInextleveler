@@ -1,9 +1,10 @@
 import { db, schema } from '@/lib/db/client'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AddResourceButton } from './add-resource-button'
 import { EditProjectButton } from '../../edit-project-button'
+import { ResourceItem } from './resource-item'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,20 @@ export default async function ProjectPage({
     .from(schema.resources)
     .where(eq(schema.resources.projectId, projectId))
     .orderBy(schema.resources.sequenceIndex)
+
+  // Fetch assessments for all resources in this project
+  let assessments: typeof schema.assessments.$inferSelect[] = []
+  if (resources.length > 0) {
+    const resourceIds = resources.map((r) => r.id)
+    assessments = await db
+      .select()
+      .from(schema.assessments)
+      .where(inArray(schema.assessments.resourceId, resourceIds))
+  }
+
+  const assessmentMap = new Map(
+    assessments.map((a) => [a.resourceId, a])
+  )
 
   const inboxCount = await db
     .select()
@@ -62,27 +77,12 @@ export default async function ProjectPage({
       ) : (
         <div className="space-y-2">
           {resources.map((resource, idx) => (
-            <div
+            <ResourceItem
               key={resource.id}
-              className="rounded-card border border-[hsl(var(--border))] p-4"
-            >
-              <div className="flex items-start justify-between">
-                <a
-                  href={resource.url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:text-[hsl(var(--accent))]"
-                >
-                  {resource.title}
-                </a>
-                <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium">
-                  {resource.status}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                {idx + 1}. {resource.sourceType} • Added {new Date(resource.addedAt).toLocaleDateString()}
-              </p>
-            </div>
+              resource={resource}
+              assessment={assessmentMap.get(resource.id)}
+              index={idx}
+            />
           ))}
         </div>
       )}

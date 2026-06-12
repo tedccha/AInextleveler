@@ -77,6 +77,7 @@ export const assessments = pgTable(
     suggestedProjectName: text('suggested_project_name'), // If new project suggested
     suggestedSequenceIndex: integer('suggested_sequence_index'),
     qualityScore: integer('quality_score'), // 1-10, AI's assessment
+    confidence: integer('confidence'), // 0-100, AI's confidence in assessment
     isDuplicate: text('is_duplicate'), // "no" | "projectId:resourceId"
     rationale: text('rationale').notNull(), // Why AI made this suggestion
     userDecision: text('user_decision', {

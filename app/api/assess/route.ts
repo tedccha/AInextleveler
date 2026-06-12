@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
         suggestedProjectName: assessment.suggestedProjectName,
         suggestedSequenceIndex: assessment.suggestedSequenceIndex || 0,
         qualityScore: assessment.qualityScore,
+        confidence: assessment.confidence,
         isDuplicate: assessment.isDuplicate ? 'yes' : 'no',
         rationale: assessment.rationale,
         userDecision: 'pending',
