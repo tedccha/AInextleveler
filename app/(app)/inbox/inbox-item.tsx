@@ -11,6 +11,7 @@ import {
   Badge,
 } from '@fluentui/react-components'
 import { toast } from 'sonner'
+import { renderMarkdown } from '@/lib/render-markdown'
 import type { InferSelectModel } from 'drizzle-orm'
 import type { projects, resources, assessments } from '@/lib/db/schema'
 
@@ -26,50 +27,6 @@ function formatDateTime(date: Date): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function renderMarkdown(text: string) {
-  const parts: (string | React.ReactNode)[] = []
-  let lastIndex = 0
-
-  // Match **bold**, *italic*, and line breaks
-  const regex = /\*\*([^*]+)\*\*|\*([^*]+)\*|(\n+)/g
-  let match
-
-  while ((match = regex.exec(text)) !== null) {
-    // Add text before match
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index))
-    }
-
-    if (match[1]) {
-      // **bold**
-      parts.push(
-        <strong key={`bold-${parts.length}`} style={{ fontWeight: 600 }}>
-          {match[1]}
-        </strong>,
-      )
-    } else if (match[2]) {
-      // *italic*
-      parts.push(
-        <em key={`italic-${parts.length}`} style={{ fontStyle: 'italic' }}>
-          {match[2]}
-        </em>,
-      )
-    } else if (match[3]) {
-      // Line breaks
-      parts.push(<br key={`br-${parts.length}`} />)
-    }
-
-    lastIndex = regex.lastIndex
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex))
-  }
-
-  return parts
 }
 
 export function InboxItem({

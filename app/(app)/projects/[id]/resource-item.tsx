@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { renderMarkdown } from '@/lib/render-markdown'
 import type { InferSelectModel } from 'drizzle-orm'
 import type { resources, assessments } from '@/lib/db/schema'
 
@@ -68,9 +69,9 @@ export function ResourceItem({
             <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
               Assessment
             </p>
-            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[hsl(var(--foreground))]">
-              {assessment.rationale}
-            </p>
+            <div className="mt-1 text-xs leading-relaxed text-[hsl(var(--foreground))]">
+              {renderMarkdown(assessment.rationale)}
+            </div>
           </div>
 
           {/* Usefulness Score (if completed) */}
