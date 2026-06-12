@@ -181,7 +181,7 @@ export function InboxItem({
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 <Button
                   onClick={() => setShowCreate(true)}
-                  appearance="primary"
+                  appearance="secondary"
                   style={{ fontSize: '13px', padding: '6px 12px' }}
                 >
                   Create
