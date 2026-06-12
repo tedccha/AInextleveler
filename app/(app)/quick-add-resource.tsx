@@ -24,6 +24,8 @@ export function QuickAddResource() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!url.trim()) return
+
     setStatus('assessing')
     setStatusMessage('Assessing...')
 
@@ -57,24 +59,26 @@ export function QuickAddResource() {
 
   return (
     <div className="mb-6">
-      <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-        <label className="text-sm font-medium whitespace-nowrap">Add Resource</label>
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://... or github.com/owner/repo"
-          disabled={status === 'assessing'}
-          required
-          className="flex-1 rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm focus:border-[hsl(var(--accent))] focus:outline-none disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={status === 'assessing'}
-          className="rounded-card bg-[hsl(var(--accent))] px-4 py-2 text-sm font-medium text-[hsl(var(--accent-foreground))] disabled:opacity-50 whitespace-nowrap"
-        >
-          {status === 'assessing' ? 'Adding...' : 'Add'}
-        </button>
+      <form onSubmit={handleSubmit}>
+        <div className="relative">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Add Resource — https://... or github.com/owner/repo"
+            disabled={status === 'assessing'}
+            className="w-full rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 pr-10 text-sm focus:border-[hsl(var(--accent))] focus:outline-none disabled:opacity-50"
+          />
+          {url.trim() && (
+            <button
+              type="submit"
+              disabled={status === 'assessing'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[hsl(var(--accent))] hover:text-[hsl(var(--accent))]/80 disabled:opacity-50 font-medium text-sm"
+            >
+              {status === 'assessing' ? '↳' : '↵'}
+            </button>
+          )}
+        </div>
       </form>
       {statusMessage && (
         <div className={`text-xs mt-1 ${
