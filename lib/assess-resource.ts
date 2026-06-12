@@ -42,7 +42,7 @@ export async function assessResource(
       ? projects
           .map(
             (p) =>
-              `- **${p.name}**: ${p.description}`,
+              `- **[${p.id}] ${p.name}**: ${p.description}`,
           )
           .join('\n')
       : 'No projects yet.'
@@ -88,13 +88,19 @@ Respond as JSON with no markdown formatting:
   "qualityReasoning": "<brief explanation of quality>",
   "isDuplicate": <true if substantially similar to existing>,
   "duplicateSimilarity": "<which existing resource, if duplicate>",
-  "suggestedProjectId": <null if no fit, or which project>,
-  "suggestedProjectName": "<name if new project should be created, null if existing>",
+  "suggestedProjectId": <null if no fit, otherwise the numeric project ID from the list above>,
+  "suggestedProjectName": "<name only if new project should be created instead, null if assigning to existing project>",
   "suggestedSequenceIndex": <0 for foundational, higher for advanced>,
   "sequenceReasoning": "<why this position>",
   "confidence": <0-100, how sure you are>,
   "overallReasoning": "<2-3 sentence summary of your assessment>"
 }
+
+**Project Matching**:
+- Match content directly to project descriptions. Read titles and descriptions carefully.
+- Return the numeric project ID that best matches this resource's content.
+- If no projects exist or nothing matches, return null for suggestedProjectId AND null for suggestedProjectName.
+- Only suggest a new project name if the resource is truly valuable but doesn't fit existing projects.
 
 **Quality Thresholds**:
 - 8-10: Foundational guides, deep technical content, original research
@@ -102,7 +108,7 @@ Respond as JSON with no markdown formatting:
 - 4-5: Decent but generic, lots of similar content already exists
 - 1-3: Fluff, listicles, regurgitated content, marketing material
 
-Be harsh on quality. Filter slop.`
+Be harsh on quality. Filter slop. Match projects by actual content fit, not by guessing.`
 
   try {
     const response = await client.messages.create({
