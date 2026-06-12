@@ -1,6 +1,7 @@
 import { db, schema } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
 import { InboxItem } from './inbox-item'
+import { QuickAddResource } from '../quick-add-resource'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,7 +34,7 @@ export default async function InboxPage() {
 
   return (
     <div className="space-y-8">
-      <h1>Assessment Queue</h1>
+      <QuickAddResource showOnInbox={true} />
 
       {/* Items pending assessment */}
       {inboxItems.length > 0 && (
