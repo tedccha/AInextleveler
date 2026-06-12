@@ -134,6 +134,7 @@ async function fetchGitHub(url: string): Promise<FetchedContent> {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}`
 
   try {
+    // Get repo metadata
     const res = await fetch(apiUrl, {
       signal: AbortSignal.timeout(10000),
     })
@@ -145,25 +146,73 @@ async function fetchGitHub(url: string): Promise<FetchedContent> {
       topics: string[]
       language: string
       stars: number
+      size: number
     }
 
-    const readmeRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/readme`,
-      {
-        headers: { Accept: 'application/vnd.github.v3.raw' },
-      },
-    )
-    const readmeContent = readmeRes.ok ? await readmeRes.text() : ''
+    // Get repo tree to understand structure
+    let treeContent = ''
+    try {
+      const treeRes = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`,
+        { signal: AbortSignal.timeout(5000) },
+      )
+      if (treeRes.ok) {
+        const treeData = (await treeRes.json()) as { tree: { path: string; type: string }[] }
+        // Get summary of structure (main source files, docs)
+        const files = treeData.tree.filter((f) => f.type === 'blob').map((f) => f.path)
+        const sourceFiles = files.filter(
+          (f) =>
+            /\.(py|js|ts|go|rs|java|cpp|c|h|rb|sh)$/.test(f) &&
+            !f.includes('test') &&
+            !f.includes('node_modules'),
+        )
+        const docFiles = files.filter(
+          (f) =>
+            /\.(md|rst|txt)$/.test(f) ||
+            f.includes('doc') ||
+            f.includes('wiki'),
+        )
+
+        treeContent = [
+          `Repository Structure:`,
+          `Total files: ${files.length}`,
+          `Main source files: ${sourceFiles.slice(0, 5).join(', ') || 'N/A'}`,
+          `Documentation: ${docFiles.slice(0, 3).join(', ') || 'N/A'}`,
+          '',
+        ].join('\n')
+      }
+    } catch {
+      // Tree fetch failed, continue with what we have
+    }
+
+    // Get README
+    let readmeContent = ''
+    try {
+      const readmeRes = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/readme`,
+        {
+          headers: { Accept: 'application/vnd.github.v3.raw' },
+          signal: AbortSignal.timeout(5000),
+        },
+      )
+      if (readmeRes.ok) {
+        readmeContent = await readmeRes.text()
+      }
+    } catch {
+      // README fetch failed, continue
+    }
 
     const content = [
       `Repository: ${data.name}`,
       `Stars: ${data.stars}`,
       `Language: ${data.language || 'N/A'}`,
       `Topics: ${data.topics.join(', ') || 'None'}`,
+      `Size: ${data.size || 'N/A'}`,
       '',
       `Description:\n${data.description || 'No description'}`,
       '',
-      `README:\n${readmeContent.slice(0, 3000)}`,
+      treeContent,
+      `README Summary:\n${readmeContent.slice(0, 2000)}`,
     ].join('\n')
 
     return {
@@ -171,7 +220,7 @@ async function fetchGitHub(url: string): Promise<FetchedContent> {
       url,
       contentType: 'github',
       summary: content.slice(0, 500),
-      fullContent: content.slice(0, 4000),
+      fullContent: content.slice(0, 6000),
       metadata: {
         language: data.language || undefined,
       },
