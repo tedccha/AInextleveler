@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AddResourceButton } from './add-resource-button'
+import { EditProjectButton } from '../../edit-project-button'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,9 +40,12 @@ export default async function ProjectPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1>{proj.name}</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1>{proj.name}</h1>
+            <EditProjectButton project={proj} />
+          </div>
           <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
             {proj.description}
           </p>
