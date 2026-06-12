@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Card, Text } from '@fluentui/react-components'
-import { db, schema } from '@/lib/db/client'
-import { desc } from 'drizzle-orm'
 
 type Resource = {
   id: number
