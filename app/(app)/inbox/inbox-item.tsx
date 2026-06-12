@@ -37,7 +37,6 @@ export function InboxItem({
   const handleAssess = async () => {
     setAssessing(true)
     try {
-      // Call assess endpoint
       const res = await fetch('/api/assess', {
         method: 'POST',
         body: JSON.stringify({ resourceId: item.id }),
@@ -47,8 +46,6 @@ export function InboxItem({
 
       const data = await res.json()
       toast.success('Resource assessed')
-
-      // Refresh page
       setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       toast.error('Assessment failed')
@@ -114,14 +111,18 @@ export function InboxItem({
           </button>
         </div>
       ) : assessment ? (
-        <div className="mt-4 space-y-3 rounded-card bg-[hsl(var(--muted))] p-3">
-          <div className="text-sm">
+        <div className="mt-4 space-y-4">
+          {/* Quality & Confidence */}
+          <div className="rounded-card bg-[hsl(var(--muted))] p-3">
             <p className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
               Quality: {assessment.qualityScore}/10 • Confidence: {assessment.confidence}%
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-xs">{assessment.rationale}</p>
+            <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed">
+              {assessment.rationale}
+            </p>
           </div>
 
+          {/* Warnings */}
           {assessment.isDuplicate && assessment.isDuplicate !== 'no' && (
             <div className="rounded border border-orange-500 bg-orange-500/10 p-2">
               <p className="text-xs font-medium text-orange-700">
@@ -138,57 +139,91 @@ export function InboxItem({
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            {assessment.suggestedProjectId ? (
-              <button
-                onClick={() => handleApprove(assessment.suggestedProjectId)}
-                className="rounded-card bg-green-600 px-3 py-1 text-sm font-medium text-white"
-              >
-                ✓ Add to {allProjects.find((p) => p.id === assessment.suggestedProjectId)?.name}
-              </button>
-            ) : assessment.suggestedProjectName ? (
-              <button
-                onClick={() => handleApprove(null)}
-                className="rounded-card bg-blue-600 px-3 py-1 text-sm font-medium text-white"
-              >
-                ➕ Create & Add to "{assessment.suggestedProjectName}"
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowOverride(true)}
-                className="rounded-card bg-gray-600 px-3 py-1 text-sm font-medium text-white"
-              >
-                Choose Project
-              </button>
-            )}
-
-            <button
-              onClick={handleReject}
-              className="rounded-card border border-[hsl(var(--border))] px-3 py-1 text-sm"
-            >
-              Reject
-            </button>
-          </div>
-
-          {showOverride && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium">Override project:</p>
-              <div className="space-y-1">
-                {allProjects.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      handleApprove(p.id)
-                      setShowOverride(false)
-                    }}
-                    className="block w-full text-left rounded border border-[hsl(var(--border))] px-2 py-1 text-xs hover:bg-[hsl(var(--muted))]"
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
+          {/* Project Fit & Assignment */}
+          <div className="space-y-3 rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--accent))]/5 p-3">
+            <div>
+              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+                Project Fit
+              </p>
+              <p className="mt-1 text-sm">
+                {assessment.suggestedProjectId
+                  ? allProjects.find((p) => p.id === assessment.suggestedProjectId)?.name
+                  : assessment.suggestedProjectName || 'No project match'}
+              </p>
             </div>
-          )}
+
+            {/* Assignment Buttons */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {assessment.suggestedProjectId ? (
+                <>
+                  <button
+                    onClick={() => handleApprove(assessment.suggestedProjectId)}
+                    className="flex-1 rounded-card bg-green-600 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    ✓ Assign to {allProjects.find((p) => p.id === assessment.suggestedProjectId)?.name}
+                  </button>
+                  <button
+                    onClick={() => setShowOverride(true)}
+                    className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
+                  >
+                    Change Project
+                  </button>
+                </>
+              ) : assessment.suggestedProjectName ? (
+                <>
+                  <button
+                    onClick={() => handleApprove(null)}
+                    className="flex-1 rounded-card bg-blue-600 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    ➕ Create & Assign "{assessment.suggestedProjectName}"
+                  </button>
+                  <button
+                    onClick={() => setShowOverride(true)}
+                    className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
+                  >
+                    Choose Different
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowOverride(true)}
+                    className="flex-1 rounded-card bg-gray-600 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    Choose Project
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={handleReject}
+                className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
+              >
+                Reject
+              </button>
+            </div>
+
+            {/* Project Override */}
+            {showOverride && (
+              <div className="space-y-2 border-t border-[hsl(var(--border))] pt-3">
+                <p className="text-xs font-medium">Choose project:</p>
+                <div className="space-y-1">
+                  {allProjects.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        handleApprove(p.id)
+                        setShowOverride(false)
+                      }}
+                      className="block w-full rounded border border-[hsl(var(--border))] px-3 py-2 text-left text-xs hover:bg-[hsl(var(--muted))]"
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
     </div>
