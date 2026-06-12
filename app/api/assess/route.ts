@@ -67,18 +67,22 @@ export async function POST(req: NextRequest) {
       })),
     )
 
+    // Validate suggestedProjectId is an integer
+    const suggestedProjectId = 
+      typeof assessment.suggestedProjectId === 'number' 
+        ? assessment.suggestedProjectId 
+        : null
+
     // Store assessment
     const assessmentRecord = await db
       .insert(schema.assessments)
       .values({
         resourceId,
-        suggestedProjectId: assessment.suggestedProjectId,
+        suggestedProjectId,
         suggestedProjectName: assessment.suggestedProjectName,
-        suggestedSequenceIndex: assessment.suggestedSequenceIndex,
+        suggestedSequenceIndex: assessment.suggestedSequenceIndex || 0,
         qualityScore: assessment.qualityScore,
-        isDuplicate: assessment.isDuplicate
-          ? `${assessment.duplicateOf?.id || 'unknown'}`
-          : 'no',
+        isDuplicate: assessment.isDuplicate ? 'yes' : 'no',
         rationale: assessment.rationale,
         userDecision: 'pending',
       })
