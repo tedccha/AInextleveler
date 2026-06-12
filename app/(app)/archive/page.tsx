@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, Text } from '@fluentui/react-components'
+import { Card, Text, Input } from '@fluentui/react-components'
 
 type Resource = {
   id: number
@@ -77,11 +77,11 @@ export default function ArchivePage() {
   const [resources, setResources] = useState<Resource[]>([])
   const [projectsById, setProjectsById] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // We need to create an API route to fetch this data
         const res = await fetch('/api/archive-data')
         if (res.ok) {
           const data = await res.json()
@@ -94,6 +94,15 @@ export default function ArchivePage() {
     }
     fetchData()
   }, [])
+
+  const filteredResources = resources.filter((resource) => {
+    const searchLower = search.toLowerCase()
+    return (
+      resource.title.toLowerCase().includes(searchLower) ||
+      resource.sourceType.toLowerCase().includes(searchLower) ||
+      (resource.projectId && projectsById[resource.projectId]?.toLowerCase().includes(searchLower))
+    )
+  })
 
   if (loading) {
     return (
@@ -115,13 +124,30 @@ export default function ArchivePage() {
         </Text>
       </div>
 
+      <div style={{ marginBottom: '20px' }}>
+        <Input
+          type="text"
+          placeholder="Search by title, source, or project..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: '100%', maxWidth: '400px' }}
+        />
+        <Text style={{ marginTop: '4px', fontSize: '12px', color: '#616161' }}>
+          {filteredResources.length} of {resources.length} resources
+        </Text>
+      </div>
+
       {resources.length === 0 ? (
         <Card style={{ padding: '24px', textAlign: 'center', backgroundColor: '#f5f5f5' }}>
           <Text style={{ color: '#616161' }}>No resources yet. Add resources from the inbox.</Text>
         </Card>
+      ) : filteredResources.length === 0 ? (
+        <Card style={{ padding: '24px', textAlign: 'center', backgroundColor: '#f5f5f5' }}>
+          <Text style={{ color: '#616161' }}>No resources match your search.</Text>
+        </Card>
       ) : (
         <div style={{ display: 'grid', gap: '12px' }}>
-          {resources.map((resource) => (
+          {filteredResources.map((resource) => (
             <Card
               key={resource.id}
               style={{
