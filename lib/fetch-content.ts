@@ -6,7 +6,7 @@
 export type FetchedContent = {
   title: string
   url: string
-  contentType: 'article' | 'github' | 'code' | 'text'
+  contentType: 'article' | 'github' | 'code' | 'text' | 'social'
   summary: string // First 500 chars of content
   fullContent: string // Up to 4000 chars for LLM assessment
   metadata: {
@@ -21,7 +21,7 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
     const response = await fetch(url, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; AIWorkshop/1.0; +http://localhost)',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       signal: AbortSignal.timeout(10000),
     })
@@ -29,6 +29,26 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
     const html = await response.text()
+    
+    // Try to extract Open Graph description for social posts
+    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/)
+    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/)
+    
+    if (ogDescMatch) {
+      const title = ogTitleMatch ? ogTitleMatch[1] : extractTitle(html, url)
+      const content = ogDescMatch[1]
+      return {
+        title,
+        url,
+        contentType: url.includes('x.com') || url.includes('twitter.com') ? 'social' : 'article',
+        summary: content.slice(0, 500),
+        fullContent: content.slice(0, 4000),
+        metadata: {
+          language: 'en',
+        },
+      }
+    }
+    
     const title = extractTitle(html, url)
     const content = extractMainContent(html)
 
