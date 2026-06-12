@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { addResourceToAnyProjectAction } from './actions'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 export function QuickAddResource() {
   const [url, setUrl] = useState('')
@@ -21,10 +22,20 @@ export function QuickAddResource() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-card border-2 border-[hsl(var(--accent))] bg-[hsl(var(--accent))]/5 p-6">
-      <h2 className="font-semibold">Add Resource</h2>
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-        Paste a link or GitHub repo. The AI will assess and suggest which project it belongs to.
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-semibold">Add Resource</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Paste a link or GitHub repo. The AI will assess and suggest which project it belongs to.
+          </p>
+        </div>
+        <Link
+          href="/inbox"
+          className="whitespace-nowrap rounded-card border border-[hsl(var(--border))] px-3 py-1 text-xs hover:bg-[hsl(var(--muted))]"
+        >
+          View Queue
+        </Link>
+      </div>
       <div className="flex gap-2">
         <input
           type="text"

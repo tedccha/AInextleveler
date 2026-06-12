@@ -10,6 +10,16 @@ type Resource = InferSelectModel<typeof resources>
 type Assessment = InferSelectModel<typeof assessments>
 type Project = InferSelectModel<typeof projects>
 
+function formatDateTime(date: Date): string {
+  return new Date(date).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export function InboxItem({
   item,
   assessment,
@@ -84,7 +94,7 @@ export function InboxItem({
       </a>
 
       <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-        {item.sourceType} • Added {new Date(item.addedAt).toLocaleDateString()}
+        {item.sourceType} • Added {formatDateTime(item.addedAt)}
       </p>
 
       {status === 'pending' ? (
