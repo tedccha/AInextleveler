@@ -3,6 +3,22 @@
 import { db, schema } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
 
+export async function createProjectWithoutRedirect(name: string, description: string) {
+  if (!name.trim() || !description.trim()) {
+    throw new Error('Name and description are required')
+  }
+
+  const result = await db
+    .insert(schema.projects)
+    .values({
+      name: name.trim(),
+      description: description.trim(),
+    })
+    .returning({ id: schema.projects.id })
+
+  return result[0]
+}
+
 export async function rejectResourceAction(resourceId: number) {
   await db
     .update(schema.resources)

@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { assessAndApproveAction, rejectResourceAction } from './actions'
+import { assessAndApproveAction, rejectResourceAction, createProjectWithoutRedirect } from './actions'
+import {
+  Button,
+  Card,
+  Text,
+  Input,
+  Textarea,
+  Badge,
+} from '@fluentui/react-components'
 import { toast } from 'sonner'
 import type { InferSelectModel } from 'drizzle-orm'
 import type { projects, resources, assessments } from '@/lib/db/schema'
@@ -32,7 +40,11 @@ export function InboxItem({
   status: 'pending' | 'review'
 }) {
   const [assessing, setAssessing] = useState(false)
-  const [showOverride, setShowOverride] = useState(false)
+  const [showSelect, setShowSelect] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createName, setCreateName] = useState(assessment?.suggestedProjectName || '')
+  const [createDescription, setCreateDescription] = useState('')
+  const [creatingProject, setCreatingProject] = useState(false)
 
   const handleAssess = async () => {
     setAssessing(true)
@@ -79,153 +91,192 @@ export function InboxItem({
     }
   }
 
+  const handleCreateAndApprove = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreatingProject(true)
+    try {
+      const result = await createProjectWithoutRedirect(createName, createDescription)
+      await assessAndApproveAction(
+        item.id,
+        assessment?.id || 0,
+        result.id,
+        assessment?.suggestedSequenceIndex || 0,
+      )
+      toast.success('Project created and resource added')
+      window.location.reload()
+    } catch (err) {
+      toast.error('Failed to create project or approve')
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
   return (
-    <div className="rounded-card border border-[hsl(var(--border))] p-4">
+    <Card style={{ padding: '16px', marginBottom: '16px' }}>
       <a
         href={item.url || '#'}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-medium hover:text-[hsl(var(--accent))]"
+        style={{
+          fontWeight: 500,
+          color: '#0078d4',
+          textDecoration: 'none',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
       >
         {item.title}
       </a>
 
-      <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+      <Text
+        style={{ marginTop: '8px', fontSize: '12px', color: '#616161' }}
+      >
         {item.sourceType} • Added {formatDateTime(item.addedAt)}
-      </p>
+      </Text>
 
       {status === 'pending' ? (
-        <div className="mt-4 flex gap-2">
-          <button
+        <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+          <Button
             onClick={handleAssess}
             disabled={assessing}
-            className="rounded-card bg-[hsl(var(--accent))] px-3 py-1 text-sm font-medium text-[hsl(var(--accent-foreground))] disabled:opacity-50"
+            appearance="primary"
           >
             {assessing ? 'Assessing...' : 'Assess'}
-          </button>
-          <button
-            onClick={handleReject}
-            className="rounded-card border border-[hsl(var(--border))] px-3 py-1 text-sm"
-          >
+          </Button>
+          <Button onClick={handleReject} appearance="secondary">
             Skip
-          </button>
+          </Button>
         </div>
       ) : assessment ? (
-        <div className="mt-4 space-y-4">
+        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Quality & Confidence */}
-          <div className="rounded-card bg-[hsl(var(--muted))] p-3">
-            <p className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
+          <Card style={{ padding: '12px', backgroundColor: '#f5f5f5' }}>
+            <Text style={{ fontSize: '12px', fontFamily: 'monospace', color: '#616161' }}>
               Quality: {assessment.qualityScore}/10 • Confidence: {assessment.confidence}%
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed">
+            </Text>
+            <Text
+              style={{
+                marginTop: '8px',
+                whiteSpace: 'pre-wrap',
+                fontSize: '12px',
+                lineHeight: 1.6,
+              }}
+            >
               {assessment.rationale}
-            </p>
-          </div>
+            </Text>
+          </Card>
 
           {/* Warnings */}
           {assessment.isDuplicate && assessment.isDuplicate !== 'no' && (
-            <div className="rounded border border-orange-500 bg-orange-500/10 p-2">
-              <p className="text-xs font-medium text-orange-700">
+            <Card style={{ padding: '8px', backgroundColor: '#fff4ce', borderLeft: '4px solid #ffb900' }}>
+              <Text style={{ fontSize: '12px', fontWeight: 500, color: '#7f3800' }}>
                 ⚠️ Similar to existing resource
-              </p>
-            </div>
-          )}
-
-          {assessment.qualityScore < 4 && (
-            <div className="rounded border border-red-500 bg-red-500/10 p-2">
-              <p className="text-xs font-medium text-red-700">
-                Quality below threshold
-              </p>
-            </div>
+              </Text>
+            </Card>
           )}
 
           {/* Project Fit & Assignment */}
-          <div className="space-y-3 rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--accent))]/5 p-3">
-            <div>
-              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
-                Project Fit
-              </p>
-              <p className="mt-1 text-sm">
-                {assessment.suggestedProjectId
-                  ? allProjects.find((p) => p.id === assessment.suggestedProjectId)?.name
-                  : assessment.suggestedProjectName || 'No project match'}
-              </p>
-            </div>
+          <Card style={{ padding: '12px', backgroundColor: '#f0f8ff', borderLeft: '4px solid #0078d4' }}>
+            {!showCreate && !showSelect && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <Button
+                  onClick={() => setShowCreate(true)}
+                  appearance="primary"
+                  style={{ fontSize: '13px', padding: '6px 12px' }}
+                >
+                  Create
+                </Button>
 
-            {/* Assignment Buttons */}
-            <div className="flex flex-wrap gap-2 pt-2">
-              {assessment.suggestedProjectId ? (
-                <>
-                  <button
-                    onClick={() => handleApprove(assessment.suggestedProjectId)}
-                    className="flex-1 rounded-card bg-green-600 px-3 py-2 text-sm font-medium text-white"
-                  >
-                    ✓ Assign to {allProjects.find((p) => p.id === assessment.suggestedProjectId)?.name}
-                  </button>
-                  <button
-                    onClick={() => setShowOverride(true)}
-                    className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
-                  >
-                    Change Project
-                  </button>
-                </>
-              ) : assessment.suggestedProjectName ? (
-                <>
-                  <button
-                    onClick={() => handleApprove(null)}
-                    className="flex-1 rounded-card bg-blue-600 px-3 py-2 text-sm font-medium text-white"
-                  >
-                    ➕ Create & Assign "{assessment.suggestedProjectName}"
-                  </button>
-                  <button
-                    onClick={() => setShowOverride(true)}
-                    className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
-                  >
-                    Choose Different
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowOverride(true)}
-                    className="flex-1 rounded-card bg-gray-600 px-3 py-2 text-sm font-medium text-white"
-                  >
-                    Choose Project
-                  </button>
-                </>
-              )}
+                <Button
+                  onClick={() => setShowSelect(true)}
+                  appearance="secondary"
+                  style={{ fontSize: '13px', padding: '6px 12px' }}
+                >
+                  Select
+                </Button>
 
-              <button
-                onClick={handleReject}
-                className="rounded-card border border-[hsl(var(--border))] px-3 py-2 text-sm"
-              >
-                Reject
-              </button>
-            </div>
+                <Button
+                  onClick={handleReject}
+                  appearance="secondary"
+                  style={{ fontSize: '13px', padding: '6px 12px', color: '#da3b01' }}
+                >
+                  Reject
+                </Button>
+              </div>
+            )}
 
-            {/* Project Override */}
-            {showOverride && (
-              <div className="space-y-2 border-t border-[hsl(var(--border))] pt-3">
-                <p className="text-xs font-medium">Choose project:</p>
-                <div className="space-y-1">
+            {/* Create Project Form */}
+            {showCreate && (
+              <div>
+                <Text style={{ fontSize: '12px', fontWeight: 500, marginBottom: '8px' }}>Create new project:</Text>
+                <form onSubmit={handleCreateAndApprove} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <Input
+                    type="text"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="Project name"
+                    required
+                  />
+                  <Textarea
+                    value={createDescription}
+                    onChange={(e) => setCreateDescription(e.target.value)}
+                    placeholder="Project description"
+                    required
+                    rows={2}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      type="submit"
+                      disabled={creatingProject}
+                      appearance="primary"
+                      style={{ flex: 1 }}
+                    >
+                      {creatingProject ? 'Creating...' : 'Create & Assign'}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setShowCreate(false)}
+                      appearance="secondary"
+                      style={{ flex: 1 }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Select Project List */}
+            {showSelect && (
+              <div>
+                <Text style={{ fontSize: '12px', fontWeight: 500, marginBottom: '8px' }}>Assign to project:</Text>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '6px' }}>
                   {allProjects.map((p) => (
-                    <button
+                    <Button
                       key={p.id}
                       onClick={() => {
                         handleApprove(p.id)
-                        setShowOverride(false)
+                        setShowSelect(false)
                       }}
-                      className="block w-full rounded border border-[hsl(var(--border))] px-3 py-2 text-left text-xs hover:bg-[hsl(var(--muted))]"
+                      appearance="secondary"
+                      style={{ fontSize: '13px', padding: '8px 10px', textAlign: 'center', whiteSpace: 'normal' }}
                     >
                       {p.name}
-                    </button>
+                    </Button>
                   ))}
                 </div>
+                <Button
+                  onClick={() => setShowSelect(false)}
+                  appearance="secondary"
+                  style={{ marginTop: '8px', width: '100%' }}
+                >
+                  Cancel
+                </Button>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       ) : null}
-    </div>
+    </Card>
   )
 }
