@@ -22,6 +22,7 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       signal: AbortSignal.timeout(10000),
     })
@@ -29,8 +30,70 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
     const html = await response.text()
+    const isXPost = url.includes('x.com') || url.includes('twitter.com')
     
-    // Try to extract Open Graph description for social posts
+    // For X posts, try multiple extraction strategies
+    if (isXPost) {
+      // Strategy 1: Look for description meta tags
+      const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/)
+      const twitterDescMatch = html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/)
+      const description = ogDescMatch?.[1] || twitterDescMatch?.[1]
+      
+      // Strategy 2: Extract from script tags (X stores initial state in JSON)
+      const scriptMatch = html.match(/<script[^>]*>window\.initialState=(.+?)<\/script>/)
+      let jsonContent = ''
+      if (scriptMatch) {
+        try {
+          const decoded = JSON.parse(scriptMatch[1])
+          // Try to find tweet text in the structure
+          jsonContent = JSON.stringify(decoded).slice(0, 2000)
+        } catch {
+          // JSON parse failed, continue
+        }
+      }
+      
+      // Strategy 3: Extract from nitter (X alternative that doesn't require JS)
+      if (!description && !jsonContent) {
+        try {
+          const nitterUrl = url.replace('x.com', 'nitter.net').replace('twitter.com', 'nitter.net')
+          const nitterRes = await fetch(nitterUrl, {
+            signal: AbortSignal.timeout(5000),
+          })
+          if (nitterRes.ok) {
+            const nitterHtml = await nitterRes.text()
+            const tweetMatch = nitterHtml.match(/<p[^>]*class=["'][^"']*tweet-text[^"']*["'][^>]*>([^<]+)/i)
+            if (tweetMatch) {
+              const content = tweetMatch[1].trim().slice(0, 4000)
+              return {
+                title: extractTitle(html, url),
+                url,
+                contentType: 'social',
+                summary: content.slice(0, 500),
+                fullContent: content,
+                metadata: { language: 'en' },
+              }
+            }
+          }
+        } catch {
+          // Nitter fallback failed, continue
+        }
+      }
+      
+      // Return whatever we found
+      const content = description || jsonContent || ''
+      if (content) {
+        return {
+          title: extractTitle(html, url),
+          url,
+          contentType: 'social',
+          summary: content.slice(0, 500),
+          fullContent: content.slice(0, 4000),
+          metadata: { language: 'en' },
+        }
+      }
+    }
+    
+    // For regular URLs, extract Open Graph metadata
     const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/)
     const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/)
     
@@ -40,12 +103,10 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
       return {
         title,
         url,
-        contentType: url.includes('x.com') || url.includes('twitter.com') ? 'social' : 'article',
+        contentType: isXPost ? 'social' : 'article',
         summary: content.slice(0, 500),
         fullContent: content.slice(0, 4000),
-        metadata: {
-          language: 'en',
-        },
+        metadata: { language: 'en' },
       }
     }
     
@@ -55,12 +116,10 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
     return {
       title,
       url,
-      contentType: 'article',
+      contentType: isXPost ? 'social' : 'article',
       summary: content.slice(0, 500),
       fullContent: content.slice(0, 4000),
-      metadata: {
-        language: 'en',
-      },
+      metadata: { language: 'en' },
     }
   } catch (err) {
     throw new Error(`Failed to fetch URL: ${String(err)}`)
@@ -68,7 +127,6 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
 }
 
 async function fetchGitHub(url: string): Promise<FetchedContent> {
-  // Extract owner/repo from URL
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)/)
   if (!match) throw new Error('Invalid GitHub URL')
 
@@ -89,7 +147,6 @@ async function fetchGitHub(url: string): Promise<FetchedContent> {
       stars: number
     }
 
-    // Fetch README
     const readmeRes = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/readme`,
       {
@@ -139,11 +196,10 @@ function extractTitle(html: string, url: string): string {
 }
 
 function extractMainContent(html: string): string {
-  // Remove scripts and styles
   let content = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, '\n') // Replace tags with newlines
+    .replace(/<[^>]+>/g, '\n')
     .split('\n')
     .filter((line) => line.trim().length > 0)
     .join('\n')
