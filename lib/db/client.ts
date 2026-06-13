@@ -2,17 +2,35 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL not set. Copy .env.example to .env and run `bun run db:up`.',
-  )
+let cachedDb: ReturnType<typeof drizzle> | null = null
+
+function getDb() {
+  if (cachedDb) return cachedDb
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL not set. Copy .env.example to .env and run `bun run db:up`.',
+    )
+  }
+
+  const client = postgres(process.env.DATABASE_URL, {
+    max: 5,
+    prepare: false,
+  })
+
+  cachedDb = drizzle(client, { schema })
+  return cachedDb
 }
 
-// Single shared connection. Local-first single-user app — no pool tuning needed.
-const client = postgres(process.env.DATABASE_URL, {
-  max: 5,
-  prepare: false, // simpler with vector custom type
-})
+// Lazy-loaded database connection
+export const db = new Proxy(
+  {},
+  {
+    get: (target, prop) => {
+      const instance = getDb()
+      return (instance as any)[prop]
+    },
+  },
+) as ReturnType<typeof drizzle>
 
-export const db = drizzle(client, { schema })
 export { schema }
