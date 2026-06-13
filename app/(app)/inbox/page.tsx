@@ -34,7 +34,7 @@ export default async function InboxPage() {
 
   return (
     <div className="space-y-8">
-      <QuickAddResource showOnInbox={true} />
+      <QuickAddResource />
 
       {/* Items pending assessment */}
       {inboxItems.length > 0 && (

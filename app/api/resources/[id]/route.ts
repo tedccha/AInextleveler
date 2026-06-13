@@ -31,7 +31,7 @@ export const PATCH = withSession(async (req, session, { params }) => {
     if (body.action === 'archive') {
       await db
         .update(schema.resources)
-        .set({ archived: true })
+        .set({ archivedAt: new Date() })
         .where(eq(schema.resources.id, id))
     } else if (body.action === 'delete') {
       await db.delete(schema.resources).where(eq(schema.resources.id, id))

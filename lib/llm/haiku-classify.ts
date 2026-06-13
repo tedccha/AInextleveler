@@ -41,7 +41,6 @@ import {
   isValidCapability,
   taxonomyForPrompt,
 } from '@/lib/taxonomy'
-import type { LessonStep } from '@/lib/db/schema'
 import { extractToolInput, ToolUseExtractError } from './tool-use'
 
 const MODEL = 'claude-haiku-4-5-20251001'
@@ -65,7 +64,6 @@ export type HaikuClassifyOutput = {
   verdictReason: string
   reviewPrompt: string | null
   confidence: 'high' | 'medium' | 'low'
-  lessonPlan: LessonStep[]
   droppedCapabilities: number
   overriddenByConfidence: boolean
 }
@@ -303,7 +301,6 @@ function fallbackNeedsReview(reason: string): HaikuClassifyOutput {
     reviewPrompt:
       "I couldn't classify this confidently. What is it about and why did you save it?",
     confidence: 'low',
-    lessonPlan: [],
     droppedCapabilities: 0,
     overriddenByConfidence: false,
   }
@@ -392,6 +389,8 @@ export async function classifyContent(
   }
 
   // lesson_plan is only meaningful when verdict='not_yet'
+  // NOTE: lesson_plan feature incomplete, disabled for now
+  /*
   let lessonPlan: LessonStep[] = []
   if (verdict === 'not_yet' && Array.isArray(parsed.lesson_plan)) {
     lessonPlan = parsed.lesson_plan
@@ -441,14 +440,16 @@ export async function classifyContent(
       .sort((a, b) => a.order - b.order)
       .map((s, idx) => ({ ...s, order: idx + 1 }))
   }
+  */
 
-  let reviewPrompt: string | null = null
-  if (verdict === 'needs_review') {
-    reviewPrompt =
-      typeof parsed.review_prompt === 'string' && parsed.review_prompt.trim()
-        ? parsed.review_prompt
-        : 'What aspect of this seems relevant to your AI work?'
-  }
+  // let reviewPrompt: string | null = null
+  // if (verdict === 'needs_review') {
+  //   reviewPrompt =
+  //     typeof parsed.review_prompt === 'string' && parsed.review_prompt.trim()
+  //       ? parsed.review_prompt
+  //       : 'What aspect of this seems relevant to your AI work?'
+  // }
+  const reviewPrompt: string | null = null
 
   return {
     title: parsed.title?.slice(0, 200) ?? 'Untitled',
@@ -462,7 +463,6 @@ export async function classifyContent(
         : 'No reason provided.',
     reviewPrompt,
     confidence,
-    lessonPlan,
     droppedCapabilities,
     overriddenByConfidence,
   }

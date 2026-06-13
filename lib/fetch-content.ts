@@ -259,12 +259,12 @@ function extractMainContent(html: string): string {
 
 export async function fetchContent(
   url: string,
-  sourceType: 'link' | 'github' | 'pastedText',
+  sourceType: 'link' | 'github' | 'pastedText' | 'upload',
 ): Promise<FetchedContent> {
-  if (sourceType === 'pastedText') {
+  if (sourceType === 'pastedText' || sourceType === 'upload') {
     return {
-      title: 'Pasted Content',
-      url: 'pasted',
+      title: sourceType === 'upload' ? 'Uploaded File' : 'Pasted Content',
+      url: sourceType === 'upload' ? 'uploaded' : 'pasted',
       contentType: 'text',
       summary: url.slice(0, 500),
       fullContent: url.slice(0, 4000),
