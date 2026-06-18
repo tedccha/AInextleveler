@@ -56,8 +56,9 @@ export async function POST(req: NextRequest) {
 
     // Check for URL-based duplicates first
     let urlDuplicate: (typeof existing)[0] | undefined
-    if (res.url && res.url.trim()) {
-      urlDuplicate = existing.find((e) => e.url && e.url.trim() === res.url.trim())
+    const resUrl = res.url?.trim()
+    if (resUrl) {
+      urlDuplicate = existing.find((e) => e.url?.trim() === resUrl)
     }
 
     // If URL match found, mark as duplicate immediately
