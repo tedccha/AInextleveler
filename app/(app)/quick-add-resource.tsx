@@ -61,23 +61,25 @@ export function QuickAddResource() {
     <div className="mb-6">
       <form onSubmit={handleSubmit}>
         <div className="relative">
-          <input
-            type="text"
+          <textarea
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Add Resource — https://... or github.com/owner/repo"
+            placeholder="Add Resource — paste a URL (https://..., github.com/owner/repo) or text content"
             disabled={status === 'assessing'}
-            className="w-full rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 pr-10 text-sm focus:border-[hsl(var(--accent))] focus:outline-none disabled:opacity-50"
+            rows={3}
+            className="w-full rounded-card border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-3 py-2 text-sm focus:border-[hsl(var(--accent))] focus:outline-none disabled:opacity-50 resize-none font-mono text-xs"
           />
-          {url.trim() && (
-            <button
-              type="submit"
-              disabled={status === 'assessing'}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[hsl(var(--accent))] hover:text-[hsl(var(--accent))]/80 disabled:opacity-50 font-medium text-sm"
-            >
-              {status === 'assessing' ? '↳' : '↵'}
-            </button>
-          )}
+          <div className="flex justify-between items-center mt-2">
+            {url.trim() && (
+              <button
+                type="submit"
+                disabled={status === 'assessing'}
+                className="text-[hsl(var(--accent))] hover:text-[hsl(var(--accent))]/80 disabled:opacity-50 font-medium text-sm px-3 py-1 rounded hover:bg-[hsl(var(--accent))]/10"
+              >
+                {status === 'assessing' ? 'Assessing...' : 'Add Resource'}
+              </button>
+            )}
+          </div>
         </div>
       </form>
       {statusMessage && (

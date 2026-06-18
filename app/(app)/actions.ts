@@ -38,61 +38,81 @@ export async function updateProjectAction(
     .where(eq(schema.projects.id, projectId))
 }
 
-export async function addResourceToAnyProjectAction(url: string) {
-  if (!url.trim()) {
-    throw new Error('URL is required')
+export async function addResourceToAnyProjectAction(
+  input: string,
+  sourceType?: 'link' | 'github' | 'pastedText',
+) {
+  if (!input.trim()) {
+    throw new Error('Input required')
   }
 
-  let title = url
-  try {
-    const urlObj = new URL(url)
-    title = urlObj.hostname
-  } catch {
-    title = url.slice(0, 50)
-  }
+  // Auto-detect sourceType if not provided
+  let detectedSourceType = sourceType
+  let title = input
+  let url: string | null = null
 
-  let sourceType: 'link' | 'github' = 'link'
-  if (url.includes('github.com')) {
-    sourceType = 'github'
-  }
-
-  // Check for exact duplicates
-  const existing = await db
-    .select()
-    .from(schema.resources)
-    .where(eq(schema.resources.url, url.trim()))
-
-  if (existing.length > 0) {
-    const dup = existing[0]
-    let location = 'in queue'
-
-    if (dup.status === 'active' && dup.projectId) {
-      // Get project name
-      const project = await db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.id, dup.projectId))
-        .limit(1)
-      if (project.length > 0) {
-        location = `in ${project[0].name}`
-      }
-    } else if (dup.status === 'archived') {
-      location = 'in Archive'
-    } else if (dup.status === 'rejected') {
-      location = 'in Rejected'
-    } else if (dup.status === 'inReview') {
-      location = 'pending approval'
+  if (!detectedSourceType) {
+    try {
+      const urlObj = new URL(input)
+      url = input.trim()
+      title = urlObj.hostname
+      detectedSourceType = input.includes('github.com') ? 'github' : 'link'
+    } catch {
+      // Not a valid URL, treat as pasted text
+      detectedSourceType = 'pastedText'
+      title = input.slice(0, 100)
     }
+  } else if (detectedSourceType === 'pastedText') {
+    title = input.slice(0, 100)
+  } else {
+    url = input.trim()
+    try {
+      const urlObj = new URL(url)
+      title = urlObj.hostname
+    } catch {
+      title = url.slice(0, 50)
+    }
+  }
 
-    throw new Error(`Duplicate: this item is already ${location}`)
+  // Check for exact URL duplicates (only for URLs, not pasted text)
+  if (url) {
+    const existing = await db
+      .select()
+      .from(schema.resources)
+      .where(eq(schema.resources.url, url))
+
+    if (existing.length > 0) {
+      const dup = existing[0]
+      let location = 'in queue'
+
+      if (dup.status === 'active' && dup.projectId) {
+        const project = await db
+          .select()
+          .from(schema.projects)
+          .where(eq(schema.projects.id, dup.projectId))
+          .limit(1)
+        if (project.length > 0) {
+          location = `in ${project[0].name}`
+        }
+      } else if (dup.status === 'archived') {
+        location = 'in Archive'
+      } else if (dup.status === 'rejected') {
+        location = 'in Rejected'
+      } else if (dup.status === 'inReview') {
+        location = 'pending approval'
+      }
+
+      throw new Error(`Duplicate: this item is already ${location}`)
+    }
   }
 
   const result = await db
     .insert(schema.resources)
     .values({
       title,
-      url: url.trim(),
-      sourceType,
+      url,
+      content: detectedSourceType === 'pastedText' ? input.trim() : undefined,
+      sourceType: detectedSourceType,
       status: 'inbox',
     })
     .returning({ id: schema.resources.id })
