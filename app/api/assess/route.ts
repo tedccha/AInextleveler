@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         id: e.id,
         title: e.title,
         url: e.url,
-        summary: content.summary,
+        summary: e.content || '',
       })),
     )
 
