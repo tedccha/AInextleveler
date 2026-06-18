@@ -78,6 +78,15 @@ export async function POST(req: NextRequest) {
         })
         .returning()
 
+      // Update resource status to inReview
+      await db
+        .update(schema.resources)
+        .set({
+          status: 'inReview',
+          title: content.title,
+        })
+        .where(eq(schema.resources.id, resourceId))
+
       return NextResponse.json({
         assessment: {
           qualityScore: 10,
