@@ -80,9 +80,15 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         assessment: {
+          qualityScore: 10,
           isDuplicate: true,
           duplicateOf: urlDuplicate,
+          suggestedProjectId: null,
+          suggestedProjectName: null,
+          suggestedSequenceIndex: 0,
           rationale: `Exact URL match: "${urlDuplicate.title}"`,
+          confidence: 100,
+          assessmentId: assessmentRecord[0].id,
         },
       })
     }
