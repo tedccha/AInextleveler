@@ -1,5 +1,5 @@
 import { db, schema } from '@/lib/db/client'
-import { eq, isNull } from 'drizzle-orm'
+import { eq, isNull, sql } from 'drizzle-orm'
 import { fetchContent } from '@/lib/fetch-content'
 import { assessResource } from '@/lib/assess-resource'
 import { NextRequest, NextResponse } from 'next/server'
@@ -45,13 +45,48 @@ export async function POST(req: NextRequest) {
       .from(schema.projects)
       .where(isNull(schema.projects.archivedAt))
 
-    // Get existing resources for dedup
+    // Get existing resources for dedup (active + inReview)
     const existing = await db
       .select()
       .from(schema.resources)
-      .where(eq(schema.resources.status, 'active'))
+      .where(
+        // Include both active and inReview for duplicate detection
+        sql`${schema.resources.status} IN ('active', 'inReview')`
+      )
 
-    // Assess
+    // Check for URL-based duplicates first
+    let urlDuplicate: (typeof existing)[0] | undefined
+    if (res.url && res.url.trim()) {
+      urlDuplicate = existing.find((e) => e.url && e.url.trim() === res.url.trim())
+    }
+
+    // If URL match found, mark as duplicate immediately
+    if (urlDuplicate) {
+      const assessmentRecord = await db
+        .insert(schema.assessments)
+        .values({
+          resourceId,
+          suggestedProjectId: null,
+          suggestedProjectName: null,
+          suggestedSequenceIndex: 0,
+          qualityScore: 10,
+          confidence: 100,
+          isDuplicate: `${urlDuplicate.id}`,
+          rationale: `Exact URL match: "${urlDuplicate.title}"`,
+          userDecision: 'pending',
+        })
+        .returning()
+
+      return NextResponse.json({
+        assessment: {
+          isDuplicate: true,
+          duplicateOf: urlDuplicate,
+          rationale: `Exact URL match: "${urlDuplicate.title}"`,
+        },
+      })
+    }
+
+    // Assess with Haiku for semantic duplicate detection
     const assessment = await assessResource(
       content,
       projects.map((p) => ({
@@ -68,10 +103,16 @@ export async function POST(req: NextRequest) {
     )
 
     // Validate suggestedProjectId is an integer
-    const suggestedProjectId = 
-      typeof assessment.suggestedProjectId === 'number' 
-        ? assessment.suggestedProjectId 
+    const suggestedProjectId =
+      typeof assessment.suggestedProjectId === 'number'
+        ? assessment.suggestedProjectId
         : null
+
+    // If Haiku detected duplicate, store the duplicate ID
+    let isDuplicateValue = 'no'
+    if (assessment.isDuplicate && assessment.duplicateOf) {
+      isDuplicateValue = `${assessment.duplicateOf.id}`
+    }
 
     // Store assessment
     const assessmentRecord = await db
@@ -83,7 +124,7 @@ export async function POST(req: NextRequest) {
         suggestedSequenceIndex: assessment.suggestedSequenceIndex || 0,
         qualityScore: assessment.qualityScore,
         confidence: assessment.confidence,
-        isDuplicate: assessment.isDuplicate ? 'yes' : 'no',
+        isDuplicate: isDuplicateValue,
         rationale: assessment.rationale,
         userDecision: 'pending',
       })
