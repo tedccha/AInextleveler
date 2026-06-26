@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { AddResourceButton } from './add-resource-button'
+import { ArchiveProjectButton } from './archive-project-button'
 import { EditProjectButton } from '../../edit-project-button'
 import { ResourceItem } from './resource-item'
 
@@ -65,7 +66,12 @@ export default async function ProjectPage({
             {proj.description}
           </p>
         </div>
-        <AddResourceButton projectId={projectId} />
+        <div className="flex gap-2">
+          {resources.length > 0 && (
+            <ArchiveProjectButton projectId={projectId} />
+          )}
+          <AddResourceButton projectId={projectId} />
+        </div>
       </div>
 
       {resources.length === 0 ? (

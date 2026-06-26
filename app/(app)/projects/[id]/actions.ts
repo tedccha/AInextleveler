@@ -1,6 +1,7 @@
 'use server'
 
 import { db, schema } from '@/lib/db/client'
+import { eq } from 'drizzle-orm'
 
 export async function addResourceAction(projectId: number, url: string) {
   if (!url.trim()) {
@@ -26,4 +27,34 @@ export async function addResourceAction(projectId: number, url: string) {
     sourceType,
     status: 'inbox',
   })
+}
+
+export async function archiveResourceAction(resourceId: number) {
+  await db
+    .update(schema.resources)
+    .set({
+      status: 'archived',
+      archivedAt: new Date(),
+    })
+    .where(eq(schema.resources.id, resourceId))
+}
+
+export async function unarchiveResourceAction(resourceId: number) {
+  await db
+    .update(schema.resources)
+    .set({
+      status: 'inbox',
+      archivedAt: null,
+    })
+    .where(eq(schema.resources.id, resourceId))
+}
+
+export async function archiveProjectResourcesAction(projectId: number) {
+  await db
+    .update(schema.resources)
+    .set({
+      status: 'archived',
+      archivedAt: new Date(),
+    })
+    .where(eq(schema.resources.projectId, projectId))
 }

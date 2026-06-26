@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, Text, Input } from '@fluentui/react-components'
+import { Card, Text, Input, Button } from '@fluentui/react-components'
 
 type Resource = {
   id: number
@@ -9,7 +9,8 @@ type Resource = {
   title: string
   sourceType: string
   addedAt: Date
-  status: 'pending' | 'review' | 'active' | 'rejected'
+  archivedAt: Date | null
+  status: string
   projectId: number | null
 }
 
@@ -18,7 +19,7 @@ type Project = {
   name: string
 }
 
-function formatDateTime(date: Date): string {
+function formatDateTime(date: Date | string): string {
   return new Date(date).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -28,66 +29,29 @@ function formatDateTime(date: Date): string {
   })
 }
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'pending':
-      return '#fff4ce'
-    case 'review':
-      return '#e7f5ff'
-    case 'active':
-      return '#f0fdf4'
-    case 'rejected':
-      return '#ffe7e0'
-    default:
-      return '#f5f5f5'
-  }
-}
-
-function getStatusBorder(status: string): string {
-  switch (status) {
-    case 'pending':
-      return '#ffb900'
-    case 'review':
-      return '#0078d4'
-    case 'active':
-      return '#107c10'
-    case 'rejected':
-      return '#da3b01'
-    default:
-      return '#e0e0e0'
-  }
-}
-
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'pending':
-      return 'Pending Assessment'
-    case 'review':
-      return 'Pending Approval'
-    case 'active':
-      return 'In Project'
-    case 'rejected':
-      return 'Rejected'
-    default:
-      return status
-  }
-}
-
 export default function ArchivePage() {
   const [resources, setResources] = useState<Resource[]>([])
   const [projectsById, setProjectsById] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [unarchiving, setUnarchiving] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/archive-data')
-        if (res.ok) {
-          const data = await res.json()
-          setResources(data.resources)
-          setProjectsById(data.projectsById)
+        setError(null)
+        const res = await fetch('/api/archive-data', { cache: 'no-store' })
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`)
         }
+        const data = await res.json()
+        setResources(data.resources || [])
+        setProjectsById(data.projectsById || {})
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch archive data'
+        setError(message)
+        console.error('Archive fetch error:', err)
       } finally {
         setLoading(false)
       }
@@ -104,6 +68,22 @@ export default function ArchivePage() {
     )
   })
 
+  const handleUnarchive = async (resourceId: number) => {
+    try {
+      setUnarchiving(resourceId)
+      const response = await fetch(`/api/unarchive/${resourceId}`, { method: 'POST' })
+      if (!response.ok) {
+        throw new Error('Failed to unarchive')
+      }
+      setResources((prev) => prev.filter((r) => r.id !== resourceId))
+    } catch (err) {
+      console.error('Unarchive error:', err)
+      alert('Failed to unarchive resource')
+    } finally {
+      setUnarchiving(null)
+    }
+  }
+
   if (loading) {
     return (
       <div>
@@ -115,12 +95,23 @@ export default function ArchivePage() {
     )
   }
 
+  if (error) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '28px', fontWeight: 600, margin: 0 }}>Resource Archive</h1>
+        <Card style={{ padding: '24px', marginTop: '16px', backgroundColor: '#fff4ce', borderLeft: '4px solid #ffb900' }}>
+          <Text style={{ color: '#333' }}>Error loading archive: {error}</Text>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 600, margin: 0 }}>Resource Archive</h1>
         <Text style={{ marginTop: '4px', color: '#616161', fontSize: '14px' }}>
-          All {resources.length} resources and their assessment status
+          {resources.length} archived resource{resources.length !== 1 ? 's' : ''}
         </Text>
       </div>
 
@@ -139,7 +130,7 @@ export default function ArchivePage() {
 
       {resources.length === 0 ? (
         <Card style={{ padding: '24px', textAlign: 'center', backgroundColor: '#f5f5f5' }}>
-          <Text style={{ color: '#616161' }}>No resources yet. Add resources from the inbox.</Text>
+          <Text style={{ color: '#616161' }}>No archived resources yet.</Text>
         </Card>
       ) : filteredResources.length === 0 ? (
         <Card style={{ padding: '24px', textAlign: 'center', backgroundColor: '#f5f5f5' }}>
@@ -152,8 +143,8 @@ export default function ArchivePage() {
               key={resource.id}
               style={{
                 padding: '12px',
-                backgroundColor: getStatusColor(resource.status),
-                borderLeft: `4px solid ${getStatusBorder(resource.status)}`,
+                backgroundColor: '#f5f5f5',
+                borderLeft: '4px solid #999',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '12px' }}>
@@ -182,26 +173,25 @@ export default function ArchivePage() {
                       display: 'block',
                     }}
                   >
-                    {resource.sourceType} • Added {formatDateTime(new Date(resource.addedAt))}
+                    {resource.sourceType} • Archived {resource.archivedAt ? formatDateTime(resource.archivedAt) : 'unknown'}
                   </Text>
                 </div>
 
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div
-                    style={{
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      color: getStatusBorder(resource.status),
-                      marginBottom: '4px',
-                    }}
-                  >
-                    {getStatusLabel(resource.status)}
-                  </div>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
                   {resource.projectId && projectsById[resource.projectId] && (
                     <Text style={{ fontSize: '11px', color: '#616161' }}>
-                      → {projectsById[resource.projectId]}
+                      {projectsById[resource.projectId]}
                     </Text>
                   )}
+                  <Button
+                    appearance="secondary"
+                    size="small"
+                    onClick={() => handleUnarchive(resource.id)}
+                    disabled={unarchiving === resource.id}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {unarchiving === resource.id ? 'Unarchiving...' : 'Unarchive'}
+                  </Button>
                 </div>
               </div>
             </Card>

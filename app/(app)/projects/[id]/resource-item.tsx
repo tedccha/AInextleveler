@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@fluentui/react-components'
 import { renderMarkdown } from '@/lib/render-markdown'
+import { archiveResourceAction } from './actions'
 import type { InferSelectModel } from 'drizzle-orm'
 import type { resources, assessments } from '@/lib/db/schema'
 
@@ -18,6 +20,17 @@ export function ResourceItem({
   index: number
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+
+  const handleArchive = async () => {
+    try {
+      setIsArchiving(true)
+      await archiveResourceAction(resource.id)
+      window.location.reload()
+    } finally {
+      setIsArchiving(false)
+    }
+  }
 
   return (
     <div className="rounded-card border border-[hsl(var(--border))] p-4">
@@ -47,9 +60,19 @@ export function ResourceItem({
             </div>
           </button>
         </div>
-        <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium whitespace-nowrap">
-          {resource.status}
-        </span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="rounded bg-[hsl(var(--muted))] px-2 py-1 text-xs font-medium whitespace-nowrap">
+            {resource.status}
+          </span>
+          <Button
+            appearance="secondary"
+            size="small"
+            onClick={handleArchive}
+            disabled={isArchiving}
+          >
+            {isArchiving ? '...' : 'Archive'}
+          </Button>
+        </div>
       </div>
 
       {expanded && assessment && (
