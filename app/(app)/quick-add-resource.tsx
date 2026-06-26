@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { addResourceToAnyProjectAction } from './actions'
 import { toast } from 'sonner'
 
@@ -10,6 +11,7 @@ export function QuickAddResource() {
   const [url, setUrl] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [statusMessage, setStatusMessage] = useState('')
+  const router = useRouter()
 
   useEffect(() => {
     if (status === 'done') {
@@ -17,10 +19,12 @@ export function QuickAddResource() {
         setStatus('idle')
         setStatusMessage('')
         setUrl('')
-      }, 4000)
+        // Refresh page data after done state to show new item
+        router.refresh()
+      }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [status])
+  }, [status, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
