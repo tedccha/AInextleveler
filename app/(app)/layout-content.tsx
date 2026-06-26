@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { FluentProvider, teamsLightTheme } from '@fluentui/react-components'
 
 export function AppLayoutContent({
@@ -10,6 +11,25 @@ export function AppLayoutContent({
   children: React.ReactNode
   logoutAction: (formData: FormData) => Promise<void>
 }) {
+  const pathname = usePathname()
+
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/'
+    return pathname.startsWith(href)
+  }
+
+  const getLinkStyle = (href: string) => {
+    const active = isActive(href)
+    return {
+      fontSize: '14px',
+      color: active ? '#0078d4' : '#616161',
+      textDecoration: 'none',
+      fontWeight: active ? 600 : 400,
+      borderBottom: active ? '2px solid #0078d4' : 'none',
+      paddingBottom: '2px',
+    }
+  }
+
   return (
     <FluentProvider theme={teamsLightTheme}>
       <div className="min-h-screen flex flex-col">
@@ -22,25 +42,33 @@ export function AppLayoutContent({
               <nav style={{ display: 'flex', gap: '16px' }}>
                 <Link
                   href="/inbox"
-                  style={{
-                    fontSize: '14px',
-                    color: '#616161',
-                    textDecoration: 'none',
+                  style={getLinkStyle('/inbox')}
+                  onMouseEnter={(e) => {
+                    if (!isActive('/inbox')) {
+                      e.currentTarget.style.color = '#0078d4'
+                    }
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0078d4')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#616161')}
+                  onMouseLeave={(e) => {
+                    if (!isActive('/inbox')) {
+                      e.currentTarget.style.color = '#616161'
+                    }
+                  }}
                 >
                   Inbox
                 </Link>
                 <Link
                   href="/archive"
-                  style={{
-                    fontSize: '14px',
-                    color: '#616161',
-                    textDecoration: 'none',
+                  style={getLinkStyle('/archive')}
+                  onMouseEnter={(e) => {
+                    if (!isActive('/archive')) {
+                      e.currentTarget.style.color = '#0078d4'
+                    }
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0078d4')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#616161')}
+                  onMouseLeave={(e) => {
+                    if (!isActive('/archive')) {
+                      e.currentTarget.style.color = '#616161'
+                    }
+                  }}
                 >
                   Archive
                 </Link>

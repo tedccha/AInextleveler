@@ -57,6 +57,15 @@ export function QuickAddResource() {
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (url.trim() && status !== 'assessing') {
+        handleSubmit(e as unknown as React.FormEvent)
+      }
+    }
+  }
+
   return (
     <div className="mb-6">
       <form onSubmit={handleSubmit}>
@@ -64,6 +73,7 @@ export function QuickAddResource() {
           <textarea
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Add Resource — paste a URL (https://..., github.com/owner/repo) or text content"
             disabled={status === 'assessing'}
             rows={3}
