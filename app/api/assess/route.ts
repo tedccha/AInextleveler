@@ -1,5 +1,6 @@
 import { db, schema } from '@/lib/db/client'
 import { eq, isNull, sql } from 'drizzle-orm'
+import { revalidatePath } from 'next/cache'
 import { fetchContent } from '@/lib/fetch-content'
 import { assessResource } from '@/lib/assess-resource'
 import { NextRequest, NextResponse } from 'next/server'
@@ -87,6 +88,9 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(schema.resources.id, resourceId))
 
+      // Revalidate inbox to show new item
+      revalidatePath('/inbox')
+
       return NextResponse.json({
         assessment: {
           qualityScore: 10,
@@ -154,6 +158,9 @@ export async function POST(req: NextRequest) {
         title: content.title,
       })
       .where(eq(schema.resources.id, resourceId))
+
+    // Revalidate inbox to show new item
+    revalidatePath('/inbox')
 
     return NextResponse.json({
       assessment: {
