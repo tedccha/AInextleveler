@@ -16,54 +16,58 @@ export type FetchedContent = {
   }
 }
 
-async function fetchUrl(url: string): Promise<FetchedContent> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: AbortSignal.timeout(10000),
-    })
+const NITTER_INSTANCES = [
+  'nitter.net',
+  'nitter.1d4.us',
+  'nitter.snopyta.org',
+  'nitter.kavin.rocks',
+]
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-    const html = await response.text()
-    const isXPost = url.includes('x.com') || url.includes('twitter.com')
-    
-    // For X posts, try multiple extraction strategies
-    if (isXPost) {
-      // Strategy 1: Look for description meta tags
-      const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/)
-      const twitterDescMatch = html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/)
-      const description = ogDescMatch?.[1] || twitterDescMatch?.[1]
-      
-      // Strategy 2: Extract from script tags (X stores initial state in JSON)
-      const scriptMatch = html.match(/<script[^>]*>window\.initialState=(.+?)<\/script>/)
-      let jsonContent = ''
-      if (scriptMatch) {
-        try {
-          const decoded = JSON.parse(scriptMatch[1])
-          // Try to find tweet text in the structure
-          jsonContent = JSON.stringify(decoded).slice(0, 2000)
-        } catch {
-          // JSON parse failed, continue
-        }
-      }
-      
-      // Strategy 3: Extract from nitter (X alternative that doesn't require JS)
-      if (!description && !jsonContent) {
-        try {
-          const nitterUrl = url.replace('x.com', 'nitter.net').replace('twitter.com', 'nitter.net')
-          const nitterRes = await fetch(nitterUrl, {
-            signal: AbortSignal.timeout(5000),
-          })
-          if (nitterRes.ok) {
-            const nitterHtml = await nitterRes.text()
-            const tweetMatch = nitterHtml.match(/<p[^>]*class=["'][^"']*tweet-text[^"']*["'][^>]*>([^<]+)/i)
-            if (tweetMatch) {
-              const content = tweetMatch[1].trim().slice(0, 4000)
+async function fetchTwitterViaX(url: string, html: string): Promise<FetchedContent | null> {
+  // Try multiple extraction strategies for X/Twitter
+  
+  // Strategy 1: Look for description meta tags
+  const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/)
+  const twitterDescMatch = html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/)
+  const description = ogDescMatch?.[1] || twitterDescMatch?.[1]
+  
+  // Strategy 2: Extract from script tags (X stores initial state in JSON)
+  let jsonContent = ''
+  const scriptMatch = html.match(/<script[^>]*>window\.initialState=(.+?)<\/script>/)
+  if (scriptMatch) {
+    try {
+      const decoded = JSON.parse(scriptMatch[1])
+      jsonContent = JSON.stringify(decoded).slice(0, 2000)
+    } catch {
+      // JSON parse failed, continue
+    }
+  }
+  
+  // Strategy 3: Extract from nitter mirrors (X alternative that doesn't require JS)
+  if (!description && !jsonContent) {
+    for (const instance of NITTER_INSTANCES) {
+      try {
+        const nitterUrl = url.replace('x.com', instance).replace('twitter.com', instance)
+        const nitterRes = await fetch(nitterUrl, {
+          signal: AbortSignal.timeout(5000),
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        })
+        
+        if (nitterRes.ok) {
+          const nitterHtml = await nitterRes.text()
+          // Try multiple selectors for tweet text
+          const selectors = [
+            /<p[^>]*class=["'][^"']*tweet-text[^"']*["'][^>]*>([^<]+)/i,
+            /<div[^>]*class=["'][^"']*tweet[^"']*["'][^>]*>[\s\S]*?<p[^>]*>([^<]+)/i,
+            /<p[^>]*>([^<]+?)<\/p>/i,
+          ]
+          
+          for (const selector of selectors) {
+            const match = nitterHtml.match(selector)
+            if (match && match[1]?.trim().length > 10) {
+              const content = match[1].trim().slice(0, 4000)
               return {
                 title: extractTitle(html, url),
                 url,
@@ -74,23 +78,50 @@ async function fetchUrl(url: string): Promise<FetchedContent> {
               }
             }
           }
-        } catch {
-          // Nitter fallback failed, continue
         }
+      } catch (err) {
+        // Try next instance
+        continue
       }
-      
-      // Return whatever we found
-      const content = description || jsonContent || ''
-      if (content) {
-        return {
-          title: extractTitle(html, url),
-          url,
-          contentType: 'social',
-          summary: content.slice(0, 500),
-          fullContent: content.slice(0, 4000),
-          metadata: { language: 'en' },
-        }
-      }
+    }
+  }
+  
+  // Return whatever we found
+  const content = description || jsonContent || ''
+  if (content) {
+    return {
+      title: extractTitle(html, url),
+      url,
+      contentType: 'social',
+      summary: content.slice(0, 500),
+      fullContent: content.slice(0, 4000),
+      metadata: { language: 'en' },
+    }
+  }
+  
+  return null
+}
+
+async function fetchUrl(url: string): Promise<FetchedContent> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow',
+    })
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    const html = await response.text()
+    const isXPost = url.includes('x.com') || url.includes('twitter.com')
+    
+    if (isXPost) {
+      const result = await fetchTwitterViaX(url, html)
+      if (result) return result
     }
     
     // For regular URLs, extract Open Graph metadata
